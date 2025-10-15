@@ -1,4 +1,12 @@
 {
+  "/api/stats/route": "app/api/stats/route.js",
+  "/ai-style/page": "app/ai-style/page.js",
+  "/api/line-quota/route": "app/api/line-quota/route.js",
+  "/api/tools/route": "app/api/tools/route.js",
+  "/api/ai-style/route": "app/api/ai-style/route.js",
   "/api/line-webhook/route": "app/api/line-webhook/route.js",
-  "/api/call/route": "app/api/call/route.js"
+  "/page": "app/page.js",
+  "/api/files/route": "app/api/files/route.js",
+  "/api/object/route": "app/api/object/route.js",
+  "/api/object/[id]/[filename]/route": "app/api/object/[id]/[filename]/route.js"
 }

@@ -1,5 +1,9 @@
 import './globals.css';
 import Sidebar from '../components/Sidebar';
+import dynamic from 'next/dynamic';
+import { Suspense } from 'react';
+
+const KpiStats = dynamic(() => import('../components/KpiStats'), { ssr: false });
 
 export const metadata = {
   title: 'LINE Bot MCP UI',
@@ -14,11 +18,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="container">
+          {/* Live KPI overview */}
+          <KpiStats />
+
+          {/* Main 2‑pane layout */}
           <div className="layout">
             <aside className="sidebar">
-              <Sidebar />
+              <Suspense fallback={<div className="muted">Loading...</div>}>
+                <Sidebar />
+              </Suspense>
             </aside>
-            {children}
+            <Suspense fallback={<section className="card"><div className="section">Loading...</div></section>}>
+              {children}
+            </Suspense>
           </div>
         </div>
       </body>

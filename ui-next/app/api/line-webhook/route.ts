@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { updateStats, addEvent } from "../../../lib/stats";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -63,6 +64,7 @@ async function getClient(): Promise<Client> {
   const client = new Client({ name: "line-bot-webhook", version: "0.1.0" });
   await client.connect(transport);
   globalThis.__mcpClientWebhook = client;
+  updateStats({ mcpConnected: true, lineWebhookActive: true });
   return client;
 }
 
@@ -92,6 +94,7 @@ export async function POST(req: Request) {
     const raw = await req.text();
     const disableVerify = String(process.env.DISABLE_LINE_SIGNATURE_VERIFY || "").toLowerCase() === "true";
     if (!disableVerify && !verifyLineSignature(raw, signature)) {
+      try { addEvent({ type: 'http', ok: false, message: 'POST /api/line-webhook 401' }); } catch {}
       return new Response(JSON.stringify({ error: "invalid signature" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -102,6 +105,7 @@ export async function POST(req: Request) {
     const events = Array.isArray(body?.events) ? body.events : [];
 
     const client = await getClient();
+    updateStats({ lineWebhookActive: true });
     if (!globalThis.__userPrefs) globalThis.__userPrefs = new Map();
     const prefs = globalThis.__userPrefs;
 
@@ -309,10 +313,12 @@ export async function POST(req: Request) {
       }
     }
 
+    try { addEvent({ type: 'http', ok: true, message: 'POST /api/line-webhook 200' }); } catch {}
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    try { addEvent({ type: 'http', ok: false, message: 'POST /api/line-webhook 500' }); } catch {}
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

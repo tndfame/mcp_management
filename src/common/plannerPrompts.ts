@@ -41,6 +41,8 @@ export function buildActionsPlannerPrompt(
     `- get_message_quota()\n` +
     `- push_text(userId?, text)\n` +
     `- push_flex(userId?, altText, contents)\n` +
+    `- make_pdf_and_push(userId?, title, content)\n` +
+    `- make_image_and_push(userId?, title, content)\n` +
     `- broadcast_text(text)\n` +
     `- broadcast_flex(altText, contents)\n` +
     `Rules:\n` +
@@ -50,6 +52,7 @@ export function buildActionsPlannerPrompt(
     `  - If the provided Knowledge is insufficient, say briefly that you don't know.\n` +
     `- Prefer push_* over broadcast_* unless user explicitly asks to announce to everyone (e.g., "broadcast", "ประกาศ", "ทุกคน").\n` +
     `- For push_flex/broadcast_flex you MUST provide both altText and a valid contents (bubble or carousel).\n` +
+    `- If user asks for a PDF/image version, choose make_pdf_and_push or make_image_and_push respectively. The content must be the composed Thai summary, not an echo.\n` +
     `- If the instruction mentions making a Flex (e.g., "flex", "เฟล็กซ์", "การ์ด", or structure like working hours/เวลาทำการ), choose push_flex (or broadcast_flex if explicitly asked).\n` +
     `  - Compose altText as a short Thai summary (e.g., "เวลาทำการร้าน").\n` +
     `  - Compose contents ONLY from the Knowledge when provided; do NOT invent hours/branches that are not in Knowledge.\n` +

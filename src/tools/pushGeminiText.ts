@@ -63,6 +63,41 @@ export default class PushGeminiText extends AbstractTool {
         }
 
         try {
+          // Guard against LINE quota exhaustion before pushing
+          try {
+            const g: any = globalThis as any;
+            const now = Date.now();
+            const CACHE_MS = 30000;
+            let quota:
+              | { remaining?: number; limited?: number; totalUsage?: number }
+              | undefined = g.__lineQuotaCache?.data;
+            if (!quota || now - g.__lineQuotaCache.ts >= CACHE_MS) {
+              try {
+                const q: any = await this.client.getMessageQuota();
+                let usage: number | undefined = undefined;
+                try {
+                  const c: any = await this.client.getMessageQuotaConsumption();
+                  usage = c?.totalUsage;
+                } catch {}
+                const limited: number | undefined = q?.value ?? q?.limited;
+                const remaining =
+                  typeof limited === "number" && typeof usage === "number"
+                    ? Math.max(0, limited - usage)
+                    : undefined;
+                quota = { limited, totalUsage: usage, remaining };
+                g.__lineQuotaCache = { ts: now, data: quota };
+              } catch {}
+            }
+            if (
+              quota &&
+              typeof quota.remaining === "number" &&
+              quota.remaining <= 0
+            ) {
+              return createErrorResponse(
+                `LINE message quota exceeded (used ${quota.totalUsage ?? "?"}/${quota.limited ?? "?"}). Skipped push.`,
+              );
+            }
+          } catch {}
           async function callGeminiOnce(
             modelName: string,
             apiVersion: "v1" | "v1beta",
@@ -78,31 +113,56 @@ export default class PushGeminiText extends AbstractTool {
                 },
               ],
             };
-            const res = await fetch(endpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-goog-api-key": apiKey,
-              },
-              body: JSON.stringify(body),
-            });
-            return res;
+            // retry for rate limits/temporary errors
+            let attempt = 0;
+            let res: Response | undefined;
+            while (attempt < 3) {
+              res = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-goog-api-key": apiKey,
+                },
+                body: JSON.stringify(body),
+              });
+              if (
+                res.ok ||
+                (res.status !== 429 && res.status !== 500 && res.status !== 503)
+              )
+                break;
+              const ra = res.headers.get("retry-after");
+              const wait = ra
+                ? parseInt(ra, 10) * 1000
+                : 500 * Math.pow(2, attempt);
+              await new Promise(r => setTimeout(r, Math.min(5000, wait)));
+              attempt++;
+            }
+            const final = res!;
+            return final;
           }
 
+          const strict = /^(1|true|yes)$/i.test(
+            String(process.env.GEMINI_NO_FALLBACK || ""),
+          );
           const tryModels: string[] = [model];
-          if (!model.endsWith("-latest")) tryModels.push(`${model}-latest`);
-          for (const m of [
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-latest",
-            "gemini-1.5-flash-latest",
-          ]) {
-            if (!tryModels.includes(m)) tryModels.push(m);
+          if (!strict) {
+            if (!model.endsWith("-latest")) tryModels.push(`${model}-latest`);
+            for (const m of [
+              "gemini-2.0-flash",
+              "gemini-2.0-flash-latest",
+              "gemini-1.5-flash-latest",
+            ]) {
+              if (!tryModels.includes(m)) tryModels.push(m);
+            }
           }
 
           let res: Response | undefined;
           let lastErrorText = "";
           for (const m of tryModels) {
-            for (const ver of ["v1", "v1beta"] as const) {
+            const versions: ("v1" | "v1beta")[] = strict
+              ? ["v1"]
+              : ["v1", "v1beta"];
+            for (const ver of versions) {
               res = await callGeminiOnce(m, ver);
               if (res.ok) {
                 break;
@@ -134,15 +194,34 @@ export default class PushGeminiText extends AbstractTool {
           // LINE text message limit is 2000 chars
           const textMessage = generated.slice(0, 2000);
 
-          const response = await this.client.pushMessage({
-            to: userId,
-            messages: [
-              {
-                type: "text",
-                text: textMessage,
-              } as unknown as messagingApi.Message,
-            ],
-          });
+          let response: any;
+          try {
+            response = await this.client.pushMessage({
+              to: userId,
+              messages: [
+                {
+                  type: "text",
+                  text: textMessage,
+                } as unknown as messagingApi.Message,
+              ],
+            });
+            console.error("[push_gemini_text] line:push ok", {
+              to: userId,
+              len: textMessage.length,
+            });
+          } catch (e: any) {
+            const msg = e?.message || String(e);
+            console.error("[push_gemini_text] line:push error", {
+              to: userId,
+              error: msg,
+            });
+            if (/\b429\b/.test(msg)) {
+              return createErrorResponse(
+                "LINE message quota exceeded (429). Skipped push.",
+              );
+            }
+            throw e;
+          }
 
           return createSuccessResponse(response);
         } catch (error: any) {

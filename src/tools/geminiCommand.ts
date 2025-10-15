@@ -1,4 +1,4 @@
-﻿import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { messagingApi } from "@line/bot-sdk";
 import fs from "fs";
 import path from "path";
@@ -13,6 +13,11 @@ import {
   buildActionsPlannerPrompt,
   buildQaPrompt,
 } from "../common/plannerPrompts.js";
+import {
+  generateUnicodePdfBuffer,
+  renderPngBannerBuffer,
+  uploadViaNextApi,
+} from "../common/render.js";
 import { loadAiStyle, normalizeGreetingIfPresent } from "../common/aiConfig.js";
 
 type GenerateContentResponse = {
@@ -136,7 +141,7 @@ export default class GeminiCommand extends AbstractTool {
       .string()
       .min(1)
       .describe(
-        "Natural language command, e.g., 'à¸”à¸¶à¸‡à¹‚à¸›à¸£à¹„à¸Ÿà¸¥à¹Œà¸‚à¸­à¸‡à¸œà¸¹à¹‰à¹ƒà¸Šà¹‰', 'à¸ªà¹ˆà¸‡à¸‚à¹‰à¸­à¸„à¸§à¸²à¸¡à¸§à¹ˆà¸² à¸ªà¸§à¸±à¸ªà¸”à¸µ', 'à¸”à¸¹à¸£à¸²à¸¢à¸à¸²à¸£ rich menu'",
+        "Natural language command, e.g., 'ดึงโปรไฟล์ของผู้ใช้', 'ส่งข้อความว่า สวัสดี', 'ดูรายการ rich menu'",
       );
 
     const modelSchema = z
@@ -339,10 +344,10 @@ export default class GeminiCommand extends AbstractTool {
           try {
             const t = txt.toLowerCase();
             const m = t.match(
-              /(?:table|à¸ˆà¸²à¸|à¹„à¸›|à¹€à¸‚à¹‰à¸²à¹„à¸›)?\s*([a-zA-Z0-9_\.]+).*?(?:à¹à¸ªà¸”à¸‡|show|top|\b)\s*(\d{1,4})/,
+              /(?:table|จาก|ไป|เข้าไป)?\s*([a-zA-Z0-9_\.]+).*?(?:แสดง|show|top|\b)\s*(\d{1,4})/,
             );
             const m2 = t.match(
-              /(?:à¹à¸ªà¸”à¸‡|show)\s*(\d{1,4}).*?from\s*([a-zA-Z0-9_\.]+)/,
+              /(?:แสดง|show)\s*(\d{1,4}).*?from\s*([a-zA-Z0-9_\.]+)/,
             );
             let table: string | undefined;
             let lim: number | undefined;
@@ -353,9 +358,7 @@ export default class GeminiCommand extends AbstractTool {
               table = m2[2];
               lim = parseInt(m2[1], 10);
             } else {
-              const m3 = t.match(
-                /(?:à¹€à¸‚à¹‰à¸²à¹„à¸›|à¹„à¸›|table)\s+([a-zA-Z0-9_\.]+)/,
-              );
+              const m3 = t.match(/(?:เข้าไป|ไป|table)\s+([a-zA-Z0-9_\.]+)/);
               if (m3) table = m3[1];
             }
             if (!table) return {};
@@ -366,7 +369,7 @@ export default class GeminiCommand extends AbstractTool {
             return {};
           }
         }
-        console.log("ðŸš€ ~ GeminiCommand ~ register ~ mode:", mode);
+        console.log("🚀 ~ GeminiCommand ~ register ~ mode:", mode);
 
         if (knowledgeSource === "mssql") {
           const parts: string[] = [];
@@ -405,10 +408,10 @@ export default class GeminiCommand extends AbstractTool {
                 } {
                   const t = (txt || "").toLowerCase();
                   const m = t.match(
-                    /(?:table|à¸ˆà¸²à¸|à¹„à¸›|à¹€à¸‚à¹‰à¸²à¹„à¸›)?\s*([a-z0-9_\.]+).*?(?:à¹à¸ªà¸”à¸‡|show|top|\b)\s*(\d{1,4})/i,
+                    /(?:table|จาก|ไป|เข้าไป)?\s*([a-z0-9_\.]+).*?(?:แสดง|show|top|\b)\s*(\d{1,4})/i,
                   );
                   const m2 = t.match(
-                    /(?:à¹à¸ªà¸”à¸‡|show)\s*(\d{1,4}).*?from\s*([a-z0-9_\.]+)/i,
+                    /(?:แสดง|show)\s*(\d{1,4}).*?from\s*([a-z0-9_\.]+)/i,
                   );
                   let table: string | undefined;
                   let lim: number | undefined;
@@ -419,9 +422,7 @@ export default class GeminiCommand extends AbstractTool {
                     table = m2[2];
                     lim = parseInt(m2[1], 10);
                   } else {
-                    const m3 = t.match(
-                      /(?:à¹€à¸‚à¹‰à¸²à¹„à¸›|à¹„à¸›|table)\s+([a-z0-9_\.]+)/i,
-                    );
+                    const m3 = t.match(/(?:เข้าไป|ไป|table)\s+([a-z0-9_\.]+)/i);
                     if (m3) table = m3[1];
                   }
                   if (table && !table.includes(".")) table = `dbo.${table}`;
@@ -443,7 +444,7 @@ export default class GeminiCommand extends AbstractTool {
                   const previewCols = cols.slice(0, 3);
                   const outLines: string[] = [];
                   outLines.push(
-                    `à¸•à¸²à¸£à¸²à¸‡ ${inferred.table} à¹à¸–à¸§à¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡ ${Math.min(rows.length, inferred.limit || 10)} à¹à¸–à¸§`,
+                    `ตาราง ${inferred.table} แถวตัวอย่าง ${Math.min(rows.length, inferred.limit || 10)} แถว`,
                   );
                   rows.slice(0, inferred.limit || 10).forEach((r, i) => {
                     const parts = previewCols.map(
@@ -499,17 +500,14 @@ export default class GeminiCommand extends AbstractTool {
               ],
             };
 
-            const res = await fetch(endpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-goog-api-key": apiKey,
-              },
-              body: JSON.stringify(body),
-            });
+            const res = await fetchGeminiWithRetry(endpoint, apiKey, body);
             dbg("qa:gemini_response", { ok: res.ok, status: res.status });
             if (!res.ok) {
               const t = await res.text();
+              dbg("qa:gemini_error_body", {
+                status: res.status,
+                text: t.slice(0, 800),
+              });
               return createErrorResponse(
                 `Gemini API error (qa): HTTP ${res.status} ${res.statusText} - ${t}`,
               );
@@ -535,6 +533,49 @@ export default class GeminiCommand extends AbstractTool {
               text = __normQA.text;
             } catch {}
             dbg("qa:push_text");
+            // Guard against LINE monthly quota exhaustion before pushing
+            try {
+              const q = await (async () => {
+                const g: any = globalThis as any;
+                const now = Date.now();
+                const CACHE_MS = 30000;
+                if (
+                  g.__lineQuotaCache &&
+                  now - g.__lineQuotaCache.ts < CACHE_MS
+                ) {
+                  return g.__lineQuotaCache.data as {
+                    remaining?: number;
+                    limited?: number;
+                    totalUsage?: number;
+                  };
+                }
+                try {
+                  const q: any = await this.client.getMessageQuota();
+                  let usage: number | undefined = undefined;
+                  try {
+                    const c: any =
+                      await this.client.getMessageQuotaConsumption();
+                    usage = c?.totalUsage;
+                  } catch {}
+                  const limited: number | undefined = q?.value ?? q?.limited;
+                  const remaining =
+                    typeof limited === "number" && typeof usage === "number"
+                      ? Math.max(0, limited - usage)
+                      : undefined;
+                  const data = { limited, totalUsage: usage, remaining };
+                  g.__lineQuotaCache = { ts: now, data };
+                  return data;
+                } catch {
+                  return {};
+                }
+              })();
+              if (typeof q.remaining === "number" && q.remaining <= 0) {
+                dbg("line:quota_exhausted", q);
+                return createErrorResponse(
+                  `LINE message quota exceeded (used ${q.totalUsage ?? "?"}/${q.limited ?? "?"}). Skipped push.`,
+                );
+              }
+            } catch {}
             const style = loadAiStyle();
             const msgs: any[] = [{ type: "text", text }];
             if (
@@ -548,10 +589,23 @@ export default class GeminiCommand extends AbstractTool {
                 stickerId: String((style as any).stickerId).trim(),
               });
             }
-            const resp = await this.client.pushMessage({
-              to,
-              messages: msgs as unknown as messagingApi.Message[],
-            });
+            let resp: any;
+            try {
+              resp = await this.client.pushMessage({
+                to,
+                messages: msgs as unknown as messagingApi.Message[],
+              });
+              dbg("line:push_message:ok", { to, count: msgs.length });
+            } catch (e: any) {
+              const msg = e?.message || String(e);
+              dbg("line:push_message:error", { to, error: msg });
+              if (/\b429\b/.test(msg)) {
+                return createErrorResponse(
+                  "LINE message quota exceeded (429). Skipped push.",
+                );
+              }
+              throw e;
+            }
             return createSuccessResponse({
               pushed: resp,
               preview: text.slice(0, 500),
@@ -560,6 +614,61 @@ export default class GeminiCommand extends AbstractTool {
             return createErrorResponse(`Failed in qa mode: ${e?.message || e}`);
           }
         }
+        // shared fetch with retry for Gemini
+        async function fetchGeminiWithRetry(
+          endpoint: string,
+          apiKey: string,
+          body: any,
+          maxRetries: number = 3,
+        ): Promise<Response> {
+          let attempt = 0;
+          let lastErr: any;
+          while (attempt <= maxRetries) {
+            const res = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-goog-api-key": apiKey,
+              },
+              body: JSON.stringify(body),
+            });
+            try {
+              const clone = res.clone();
+              const txt = await clone.text();
+              dbg("gemini:response", {
+                attempt,
+                status: res.status,
+                ok: res.ok,
+                endpoint,
+                text: txt.slice(0, 800),
+              });
+            } catch {}
+            if (res.ok) return res;
+            lastErr = res;
+            // Respect Retry-After when present; otherwise exponential backoff
+            if (
+              res.status === 429 ||
+              res.status === 503 ||
+              res.status === 500
+            ) {
+              const ra = res.headers.get("retry-after");
+              let wait = ra
+                ? parseInt(ra, 10) * 1000
+                : 500 * Math.pow(2, attempt);
+              dbg("gemini:retry", {
+                attempt,
+                waitMs: Math.min(5000, wait),
+                status: res.status,
+              });
+              await new Promise(r => setTimeout(r, Math.min(5000, wait)));
+              attempt++;
+              continue;
+            }
+            break;
+          }
+          return lastErr as Response;
+        }
+
         // actions planner using centralized prompt helper
         async function callPlannerOnce(
           modelName: string,
@@ -594,32 +703,33 @@ export default class GeminiCommand extends AbstractTool {
               },
             ],
           };
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-goog-api-key": apiKey,
-            },
-            body: JSON.stringify(body),
-          });
+          const res = await fetchGeminiWithRetry(endpoint, apiKey, body);
           return res;
         }
 
         try {
+          const strict = /^(1|true|yes)$/i.test(
+            String(process.env.GEMINI_NO_FALLBACK || ""),
+          );
           const tryModels: string[] = [model];
-          if (!model.endsWith("-latest")) tryModels.push(`${model}-latest`);
-          for (const m of [
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-latest",
-            "gemini-1.5-flash-latest",
-          ]) {
-            if (!tryModels.includes(m)) tryModels.push(m);
+          if (!strict) {
+            if (!model.endsWith("-latest")) tryModels.push(`${model}-latest`);
+            for (const m of [
+              "gemini-2.0-flash",
+              "gemini-2.0-flash-latest",
+              "gemini-1.5-flash-latest",
+            ]) {
+              if (!tryModels.includes(m)) tryModels.push(m);
+            }
           }
 
           let res: Response | undefined;
           let lastErr = "";
           for (const m of tryModels) {
-            for (const ver of ["v1", "v1beta"] as const) {
+            const versions: ("v1" | "v1beta")[] = strict
+              ? ["v1"]
+              : ["v1", "v1beta"];
+            for (const ver of versions) {
               res = await callPlannerOnce(m, ver);
               if (res.ok) break;
               lastErr = await res.text();
@@ -750,26 +860,113 @@ export default class GeminiCommand extends AbstractTool {
             (userId as string) ||
             this.destinationId;
           switch (plan.action) {
+            case "make_pdf_and_push": {
+              if (!to) return createErrorResponse(NO_USER_ID_ERROR);
+              const title = String(plan.args?.title || "Report");
+              const content = String(plan.args?.content || "");
+              try {
+                const pdfBuf = await generateUnicodePdfBuffer(title, content);
+                const up = await uploadViaNextApi(
+                  pdfBuf,
+                  "application/pdf",
+                  "promo",
+                );
+                const baseURL =
+                  process.env.PUBLIC_BASE_URL?.replace(/\/$/, "") || "";
+                const text = `${baseURL}${up.url}`;
+                const resp = await this.client.pushMessage({
+                  to,
+                  messages: [
+                    { type: "text", text } as unknown as messagingApi.Message,
+                  ],
+                });
+                return createSuccessResponse({
+                  pdf: { url: up.url, filename: up.filename },
+                  pushed: resp,
+                });
+              } catch (e: any) {
+                return createErrorResponse(
+                  `Failed to generate PDF: ${e?.message || e}`,
+                );
+              }
+            }
+            case "make_image_and_push": {
+              dbg("make_image_and_push: start");
+              if (!to) return createErrorResponse(NO_USER_ID_ERROR);
+              dbg("make_image_and_push: start2");
+              const title = String(plan.args?.title || "Promo");
+              const content = String(plan.args?.content || "");
+              try {
+                const fontPath =
+                  String(process.env.THAI_FONT_PATH || "").trim() || undefined;
+                dbg("make_image_and_push: start3");
+                const imgBuf = await renderPngBannerBuffer(title, content, {
+                  fontPath,
+                });
+                dbg("make_image_and_push: start4");
+                dbg("make_image_and_push: 1", { imgBuf: imgBuf });
+                const up = await uploadViaNextApi(
+                  imgBuf as any,
+                  "image/png",
+                  "promo",
+                );
+                const base =
+                  process.env.PUBLIC_BASE_URL?.replace(/\/$/, "") || "";
+                const absUrl = base ? `${base}${up.url}` : up.url;
+                dbg("make_image_and_push: 2", { absUrl: absUrl });
+                const messages: any[] = [];
+                if (base) {
+                  messages.push({
+                    type: "image",
+                    originalContentUrl: absUrl,
+                    previewImageUrl: absUrl,
+                  });
+                }
+                messages.push({
+                  type: "text",
+                  text: `??????????????: ${absUrl}`,
+                });
+                const resp = await this.client.pushMessage({
+                  to,
+                  messages: messages as unknown as messagingApi.Message[],
+                });
+                return createSuccessResponse({
+                  image: { url: absUrl, filename: up.filename },
+                  pushed: resp,
+                });
+              } catch (e: any) {
+                dbg("make_image_and_push: error", { error: e?.message || e });
+                return createErrorResponse(
+                  `Failed to generate Image: ${e?.message || e}`,
+                );
+              }
+            }
             case "get_profile": {
               if (!to) return createErrorResponse(NO_USER_ID_ERROR);
               const profile = await this.client.getProfile(to);
               // Also push a readable summary to LINE so the user "sees" it in chat
               const lines: string[] = [];
               if ((profile as any)?.displayName)
-                lines.push(`à¸Šà¸·à¹ˆà¸­: ${(profile as any).displayName}`);
+                lines.push(`ชื่อ: ${(profile as any).displayName}`);
               lines.push(`User ID: ${to}`);
               if ((profile as any)?.statusMessage)
-                lines.push(
-                  `à¸ªà¸–à¸²à¸™à¸°: ${(profile as any).statusMessage}`,
-                );
+                lines.push(`สถานะ: ${(profile as any).statusMessage}`);
               const text = lines.join("\n");
               try {
-                await this.client.pushMessage({
-                  to,
-                  messages: [
-                    { type: "text", text } as unknown as messagingApi.Message,
-                  ],
-                });
+                try {
+                  const r = await this.client.pushMessage({
+                    to,
+                    messages: [
+                      { type: "text", text } as unknown as messagingApi.Message,
+                    ],
+                  });
+                  dbg("line:push_message:ok", { to, count: 1 });
+                } catch (e: any) {
+                  dbg("line:push_message:error", {
+                    to,
+                    error: e?.message || String(e),
+                  });
+                }
               } catch {
                 // ignore push failure, still return profile
               }
@@ -782,7 +979,7 @@ export default class GeminiCommand extends AbstractTool {
                 if (to) {
                   const menus: any[] = (list as any)?.richmenus || [];
                   const count = menus.length;
-                  const head = `Rich Menu à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”: ${count} à¸£à¸²à¸¢à¸à¸²à¸£`;
+                  const head = `Rich Menu ทั้งหมด: ${count} รายการ`;
                   const details = menus
                     .slice(0, 3)
                     .map(
@@ -791,12 +988,23 @@ export default class GeminiCommand extends AbstractTool {
                     )
                     .join("\n");
                   const text = details ? `${head}\n${details}` : head;
-                  await this.client.pushMessage({
-                    to,
-                    messages: [
-                      { type: "text", text } as unknown as messagingApi.Message,
-                    ],
-                  });
+                  try {
+                    const r = await this.client.pushMessage({
+                      to,
+                      messages: [
+                        {
+                          type: "text",
+                          text,
+                        } as unknown as messagingApi.Message,
+                      ],
+                    });
+                    dbg("line:push_message:ok", { to, count: 1 });
+                  } catch (e: any) {
+                    dbg("line:push_message:error", {
+                      to,
+                      error: e?.message || String(e),
+                    });
+                  }
                 }
               } catch {
                 // ignore push failure
@@ -818,22 +1026,16 @@ export default class GeminiCommand extends AbstractTool {
                     (q as any)?.value ?? (q as any)?.limited ?? undefined;
                   const lines: string[] = [];
                   if (typeof limited === "number")
-                    lines.push(
-                      `à¹‚à¸„à¸§à¸•à¸²à¸•à¹ˆà¸­à¹€à¸”à¸·à¸­à¸™: ${limited.toLocaleString()}`,
-                    );
+                    lines.push(`โควตาต่อเดือน: ${limited.toLocaleString()}`);
                   if (typeof usage === "number")
-                    lines.push(`à¹ƒà¸Šà¹‰à¹„à¸›: ${usage.toLocaleString()}`);
+                    lines.push(`ใช้ไป: ${usage.toLocaleString()}`);
                   const remaining =
                     typeof limited === "number" && typeof usage === "number"
                       ? Math.max(0, limited - usage)
                       : undefined;
                   if (typeof remaining === "number")
-                    lines.push(
-                      `à¸„à¸‡à¹€à¸«à¸¥à¸·à¸­: ${remaining.toLocaleString()}`,
-                    );
-                  const text =
-                    lines.join("\n") ||
-                    "à¸”à¸¹à¹‚à¸„à¸§à¸•à¸²à¸ªà¸³à¹€à¸£à¹‡à¸ˆ";
+                    lines.push(`คงเหลือ: ${remaining.toLocaleString()}`);
+                  const text = lines.join("\n") || "ดูโควตาสำเร็จ";
                   await this.client.pushMessage({
                     to,
                     messages: [
@@ -871,6 +1073,47 @@ export default class GeminiCommand extends AbstractTool {
                 text = __normPT.text;
               } catch {}
               dbg("push_text:push");
+              // Guard against LINE monthly quota exhaustion
+              try {
+                const g: any = globalThis as any;
+                const now = Date.now();
+                const CACHE_MS = 30000;
+                let quota:
+                  | {
+                      remaining?: number;
+                      limited?: number;
+                      totalUsage?: number;
+                    }
+                  | undefined = g.__lineQuotaCache?.data;
+                if (!quota || now - g.__lineQuotaCache.ts >= CACHE_MS) {
+                  try {
+                    const q: any = await this.client.getMessageQuota();
+                    let usage: number | undefined = undefined;
+                    try {
+                      const c: any =
+                        await this.client.getMessageQuotaConsumption();
+                      usage = c?.totalUsage;
+                    } catch {}
+                    const limited: number | undefined = q?.value ?? q?.limited;
+                    const remaining =
+                      typeof limited === "number" && typeof usage === "number"
+                        ? Math.max(0, limited - usage)
+                        : undefined;
+                    quota = { limited, totalUsage: usage, remaining };
+                    g.__lineQuotaCache = { ts: now, data: quota };
+                  } catch {}
+                }
+                if (
+                  quota &&
+                  typeof quota.remaining === "number" &&
+                  quota.remaining <= 0
+                ) {
+                  dbg("line:quota_exhausted", quota);
+                  return createErrorResponse(
+                    `LINE message quota exceeded (used ${quota.totalUsage ?? "?"}/${quota.limited ?? "?"}). Skipped push.`,
+                  );
+                }
+              } catch {}
               const style = loadAiStyle();
               const msgs: any[] = [{ type: "text", text }];
               if (
@@ -884,10 +1127,23 @@ export default class GeminiCommand extends AbstractTool {
                   stickerId: String((style as any).stickerId).trim(),
                 });
               }
-              const resp = await this.client.pushMessage({
-                to,
-                messages: msgs as unknown as messagingApi.Message[],
-              });
+              let resp: any;
+              try {
+                resp = await this.client.pushMessage({
+                  to,
+                  messages: msgs as unknown as messagingApi.Message[],
+                });
+                dbg("line:push_message:ok", { to, count: msgs.length });
+              } catch (e: any) {
+                const msg = e?.message || String(e);
+                dbg("line:push_message:error", { to, error: msg });
+                if (/\b429\b/.test(msg)) {
+                  return createErrorResponse(
+                    "LINE message quota exceeded (429). Skipped push.",
+                  );
+                }
+                throw e;
+              }
               return createSuccessResponse(resp);
             }
             case "push_flex": {
@@ -901,10 +1157,20 @@ export default class GeminiCommand extends AbstractTool {
                 );
               const message = { type: "flex", altText, contents } as any;
               dbg("push_flex:push");
-              const resp = await this.client.pushMessage({
-                to,
-                messages: [message as unknown as messagingApi.Message],
-              });
+              let resp: any;
+              try {
+                resp = await this.client.pushMessage({
+                  to,
+                  messages: [message as unknown as messagingApi.Message],
+                });
+                dbg("line:push_message:ok", { to, count: 1 });
+              } catch (e: any) {
+                dbg("line:push_message:error", {
+                  to,
+                  error: e?.message || String(e),
+                });
+                throw e;
+              }
               return createSuccessResponse(resp);
             }
             case "broadcast_text": {
@@ -913,11 +1179,18 @@ export default class GeminiCommand extends AbstractTool {
                 return createErrorResponse(
                   "Missing args.text for broadcast_text",
                 );
-              const resp = await this.client.broadcast({
-                messages: [
-                  { type: "text", text } as unknown as messagingApi.Message,
-                ],
-              });
+              let resp: any;
+              try {
+                resp = await this.client.broadcast({
+                  messages: [
+                    { type: "text", text } as unknown as messagingApi.Message,
+                  ],
+                });
+                dbg("line:broadcast:ok", { count: 1 });
+              } catch (e: any) {
+                dbg("line:broadcast:error", { error: e?.message || String(e) });
+                throw e;
+              }
               return createSuccessResponse(resp);
             }
             case "broadcast_flex": {
@@ -927,15 +1200,22 @@ export default class GeminiCommand extends AbstractTool {
                 return createErrorResponse(
                   "Missing altText or contents for broadcast_flex",
                 );
-              const resp = await this.client.broadcast({
-                messages: [
-                  {
-                    type: "flex",
-                    altText,
-                    contents,
-                  } as unknown as messagingApi.Message,
-                ],
-              });
+              let resp: any;
+              try {
+                resp = await this.client.broadcast({
+                  messages: [
+                    {
+                      type: "flex",
+                      altText,
+                      contents,
+                    } as unknown as messagingApi.Message,
+                  ],
+                });
+                dbg("line:broadcast:ok", { count: 1 });
+              } catch (e: any) {
+                dbg("line:broadcast:error", { error: e?.message || String(e) });
+                throw e;
+              }
               return createSuccessResponse(resp);
             }
             default:
