@@ -1,0 +1,27 @@
+{
+  "push_text": {
+    "messages": [
+      { "type": "text", "text": "สวัสดีจาก OA" }
+    ]
+  },
+  "promo_flex": {
+    "messages": [
+      {
+        "type": "flex",
+        "altText": "โปรโมชัน",
+        "contents": {
+          "type": "bubble",
+          "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+              { "type": "text", "text": "โปรวันนี้", "weight": "bold", "size": "lg" },
+              { "type": "text", "text": "ลด 20% สินค้าร่วมรายการ", "size": "sm", "color": "#666666" }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+

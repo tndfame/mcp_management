@@ -1,0 +1,17 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  timezone: "Asia/Tokyo",
+  automerge: true,
+  platformAutomerge: true,
+  minimumReleaseAge : "7 days",
+  labels: [
+    "dependency upgrade"
+  ],
+  ignoreDeps: [
+    "zod"
+  ]
+}

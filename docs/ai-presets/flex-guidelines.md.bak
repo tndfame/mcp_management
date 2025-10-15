@@ -1,0 +1,8 @@
+# LINE Flex Output Guidelines
+
+- ส่งออกเฉพาะ JSON ของ `contents` (type: `bubble` หรือ `carousel`)
+- ห้ามใส่ markdown/code fences เช่น ```json
+- ใช้ฟิลด์ที่รองรับตามสเปก LINE Flex เท่านั้น
+- ตัวอักษรสั้น กระชับ อ่านง่าย
+- ถ้าข้อมูลไม่พอ ให้เว้นหรือตัดออก อย่าเดา
+

@@ -1,0 +1,15 @@
+{
+  "personaName": "มารคัสแรชฟอด",
+  "tone": "friendly",
+  "language": "th",
+  "emojiLevel": 3,
+  "replyLength": "medium",
+  "includeSignature": true,
+  "extraGuidelines": "",
+  "politeParticle": "ครับ",
+  "greetWithName": true,
+  "signatureText": "ทีมบริการลูกค้า Amorim",
+  "includeSticker": true,
+  "stickerPackageId": "8515",
+  "stickerId": "16581242"
+}

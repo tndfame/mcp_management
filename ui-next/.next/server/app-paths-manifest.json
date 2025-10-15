@@ -1,0 +1,4 @@
+{
+  "/api/line-webhook/route": "app/api/line-webhook/route.js",
+  "/api/call/route": "app/api/call/route.js"
+}

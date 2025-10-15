@@ -1,0 +1,55 @@
+{
+  "name": "@line/line-bot-mcp-server",
+  "version": "0.0.1-local",
+  "description": "MCP server for interacting with your LINE Official Account",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "module": "./dist/index.js",
+  "bin": {
+    "line-bot-mcp-server": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "prettier": "prettier \"src/**/*.ts\"",
+    "format": "npm run prettier -- --write",
+    "format:check": "npm run prettier -- -l",
+    "clean": "shx rm -rf dist/*",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "ui": "tsx scripts/playground.ts",
+    "push:gemini": "tsx scripts/pushGemini.ts",
+    "prebuild": "npm run format:check && npm run clean",
+    "release": "npm run build && npm publish --provenance --access public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:line/line-bot-mcp-server.git"
+  },
+  "keywords": [
+    "line",
+    "bot",
+    "mcp"
+  ],
+  "homepage": "https://github.com/line/line-bot-mcp-server",
+  "bugs": "https://github.com/line/line-bot-mcp-server/issues",
+  "dependencies": {
+    "@line/bot-sdk": "^10.0.0",
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "mssql": "^12.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.8",
+    "@types/node": "^22",
+    "prettier": "3.6.2",
+    "shx": "^0.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.6.2"
+  },
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.17.1+sha512.17c560fca4867ae9473a3899ad84a88334914f379be46d455cbf92e5cf4b39d34985d452d2583baf19967fa76cb5c17bc9e245529d0b98745721aa7200ecaf7a"
+}

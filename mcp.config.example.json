@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "line-bot": {
+      "command": "node",
+      "args": [
+        "dist/index.js"
+      ],
+      "cwd": ".",
+      "note": "If you use .env, you can omit env below because the server auto-loads .env",
+      "env": {
+        "CHANNEL_ACCESS_TOKEN": "FILL_HERE",
+        "DESTINATION_USER_ID": "FILL_HERE",
+        "GEMINI_API_KEY": "FILL_HERE"
+      }
+    }
+  }
+}
