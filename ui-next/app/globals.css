@@ -14,6 +14,8 @@
   --success: #22c55e;        /* status green */
   --warning: #f59e0b;        /* status amber */
   --danger: #ef4444;         /* status red */
+  --scrollbar: rgba(148,163,184,0.35); /* minimal thumb */
+  --scrollbar-hover: rgba(148,163,184,0.55);
 }
 
 * { box-sizing: border-box; }
@@ -25,7 +27,34 @@ body {
               radial-gradient(1000px 500px at 100% -20%, #14213d 0%, transparent 60%),
               linear-gradient(180deg, #0a0f1a 0%, var(--bg) 100%);
   color: var(--text);
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable both-edges;
 }
+
+/* Minimal global scrollbar (Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+/* Minimal global scrollbar (WebKit/Blink) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar);
+  border-radius: 999px;
+  border: 2px solid transparent; /* creates padding for slimmer look */
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-hover);
+}
+::-webkit-scrollbar-corner { background: transparent; }
 
 .container { width: 100%; max-width: none; margin: 0; padding: 8px 12px 16px; }
 
@@ -47,7 +76,7 @@ body {
 /* Make panels stretch to viewport height minus header/overview */
 .layout { min-height: calc(100vh - 180px); }
 
-.sidebar { background: var(--sidebar); border: 1px solid var(--border); border-radius: 12px; padding: 12px; max-height: 70vh; overflow: auto; }
+.sidebar { background: var(--sidebar); border: 1px solid var(--border); border-radius: 12px; padding: 9px; max-height: 70vh; overflow: auto; }
 .tool-list { list-style: none; margin: 0; padding: 0; }
 .tool-item {
   display: flex;
